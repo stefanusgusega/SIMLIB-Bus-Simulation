@@ -822,15 +822,3 @@ lcgrandgt (int stream)		/* Return the current zrng for stream "stream". */
 {
   return zrng[stream];
 }
-
-int main() {
-  double y[26];
-  y[0] = 0.583;
-  y[1] = 0.417;
-  y[2] = 1.0;
-  // y[3] = 1.0;
-  int x = random_integer(y,1);
-  printf("%d\n", x);
-
-  return 0;
-}

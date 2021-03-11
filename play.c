@@ -54,6 +54,7 @@
 #define ARRIVED 1
 #define DESTINATION 2
 
+void log_event();
 void init_model();
 int random_destination();
 double time_spent_to_next_place(double distance);
@@ -103,7 +104,7 @@ int main() {
 
   while (next_event_type != EVENT_ENDOFTIME) {
     timing();
-
+    
     switch(next_event_type) {
       case EVENT_BUS_ARRIVAL_TERMINAL_1:
         arrive_terminal_1();
@@ -168,7 +169,7 @@ void init_model() {
   event_schedule(sim_time + interarrival_time_terminal_1(), EVENT_PASSENGER_ARRIVAL_TERMINAL_1);
   event_schedule(sim_time + interarrival_time_terminal_2(), EVENT_PASSENGER_ARRIVAL_TERMINAL_2);
 
-  event_schedule(sim_time + interarrival_time_car_rental(), EVENT_BUS_ARRIVAL_CAR_RENTAL);
+  event_schedule(sim_time + interarrival_time_terminal_1(), EVENT_BUS_ARRIVAL_TERMINAL_1);
   event_schedule(time_end, EVENT_ENDOFTIME);
 
   sampst(0.0, 0);
@@ -203,26 +204,26 @@ double interarrival_time_terminal_2() {
 }
 
 void passenger_arrival_car_rental() {
-  event_schedule(sim_time + interarrival_time_car_rental(), EVENT_PASSENGER_ARRIVAL_CAR_RENTAL);
-  list_file(LAST, LIST_QUEUE_CAR_RENTAL);
   transfer[ARRIVED] = sim_time;
   transfer[DESTINATION] = random_destination();
+  list_file(LAST, LIST_QUEUE_CAR_RENTAL);
   timest(list_size[LIST_QUEUE_CAR_RENTAL], VARIABLE_LIST_QUEUE_CAR_RENTAL);
+  event_schedule(sim_time + interarrival_time_car_rental(), EVENT_PASSENGER_ARRIVAL_CAR_RENTAL);
 }
 
 void passenger_arrival_terminal_1() {
-  list_file(LAST, LIST_QUEUE_TERMINAL_1);
-  timest(list_size[LIST_QUEUE_TERMINAL_1], VARIABLE_LIST_QUEUE_TERMINAL_1);
   transfer[ARRIVED] = sim_time;
   transfer[DESTINATION] = DESTINATION_CAR_RENTAL;
+  list_file(LAST, LIST_QUEUE_TERMINAL_1);
+  timest(list_size[LIST_QUEUE_TERMINAL_1], VARIABLE_LIST_QUEUE_TERMINAL_1);
   event_schedule(sim_time + interarrival_time_terminal_1(), EVENT_PASSENGER_ARRIVAL_TERMINAL_1);
 }
 
 void passenger_arrival_terminal_2() {
-  list_file(LAST, LIST_QUEUE_TERMINAL_2);
-  timest(list_size[LIST_QUEUE_TERMINAL_2], VARIABLE_LIST_QUEUE_TERMINAL_2);
   transfer[ARRIVED] = sim_time;
   transfer[DESTINATION] = DESTINATION_CAR_RENTAL;
+  list_file(LAST, LIST_QUEUE_TERMINAL_2);
+  timest(list_size[LIST_QUEUE_TERMINAL_2], VARIABLE_LIST_QUEUE_TERMINAL_2);
   event_schedule(sim_time + interarrival_time_terminal_2(), EVENT_PASSENGER_ARRIVAL_TERMINAL_2);
 }
 
@@ -244,7 +245,7 @@ void arrive_car_rental() {
 }
 
 void depart_car_rental() {
-  if (sim_time - bus_arrival < min_wait) { // Bus has to wait at least 5 minutes
+  if ((sim_time - bus_arrival) < min_wait) { // Bus has to wait at least 5 minutes
     event_schedule(bus_arrival + min_wait, EVENT_BUS_DEPARTURE_CAR_RENTAL);
   } else {
     sampst(sim_time - bus_last_departure_from_car_rental, VARIABLE_BUS_LOOP);
@@ -272,11 +273,11 @@ void arrive_terminal_1() {
 }
 
 void depart_terminal_1() {
-  if (sim_time - bus_arrival < min_wait) { // Bus has to wait at least 5 minutes
+  if ((sim_time - bus_arrival) < min_wait) { // Bus has to wait at least 5 minutes
     event_schedule(bus_arrival + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_1);
   } else {
     sampst(sim_time - bus_arrival, VARIABLE_BUS_STOP_TIME_TERMINAL_1);
-    event_schedule(sim_time + time_spent_to_next_place(1), EVENT_BUS_ARRIVAL_TERMINAL_2);
+    event_schedule(sim_time + time_spent_to_next_place(1.0), EVENT_BUS_ARRIVAL_TERMINAL_2);
   }
 }
 
@@ -298,7 +299,7 @@ void arrive_terminal_2() {
 }
 
 void depart_terminal_2() {
-  if (sim_time - bus_arrival < min_wait) { // Bus has to wait at least 5 minutes
+  if ((sim_time - bus_arrival) < min_wait) { // Bus has to wait at least 5 minutes
     event_schedule(bus_arrival + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_2);
   } else {
     sampst(sim_time - bus_arrival, VARIABLE_BUS_STOP_TIME_TERMINAL_2);
@@ -311,7 +312,7 @@ void load_passenger_car_rental() {
   timest(list_size[LIST_QUEUE_CAR_RENTAL], VARIABLE_LIST_QUEUE_CAR_RENTAL);
   sampst(sim_time - transfer[ARRIVED], VARIABLE_DELAY_CAR_RENTAL);
   
-  if (transfer[ARRIVED] == DESTINATION_TERMINAL_1) list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_1);
+  if (transfer[DESTINATION] == DESTINATION_TERMINAL_1) list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_1);
   else list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_2);
 
   timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);

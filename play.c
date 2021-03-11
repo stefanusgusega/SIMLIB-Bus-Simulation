@@ -54,7 +54,6 @@
 #define ARRIVED 1
 #define DESTINATION 2
 
-void log_event();
 void init_model();
 int random_destination();
 double time_spent_to_next_place(double distance);
@@ -104,7 +103,7 @@ int main() {
 
   while (next_event_type != EVENT_ENDOFTIME) {
     timing();
-    
+
     switch(next_event_type) {
       case EVENT_BUS_ARRIVAL_TERMINAL_1:
         arrive_terminal_1();

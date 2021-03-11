@@ -66,8 +66,13 @@ void depart_terminal_2();
 void passenger_arrival_car_rental();
 void passenger_arrival_terminal_1();
 void passenger_arrival_terminal_2();
-void load_passenger();
-void unload_passenger();
+void load_passenger_car_rental();
+void load_passenger_terminal_1();
+void load_passenger_terminal_2();
+void unload_passenger_car_rental();
+void unload_passenger_terminal_1();
+void unload_passenger_terminal_2();
+int current_amount_of_passengers();
 double interarrival_time_car_rental();
 double interarrival_time_terminal_1();
 double interarrival_time_terminal_2();
@@ -119,22 +124,22 @@ int main() {
         depart_car_rental();
         break;
       case EVENT_LOAD_PASSENGER_TERMINAL_1:
-        load_passenger(1);
+        load_passenger_terminal_1();
         break;
       case EVENT_LOAD_PASSENGER_TERMINAL_2:
-        load_passenger(2);
+        load_passenger_terminal_2();
         break;
       case EVENT_LOAD_PASSENGER_CAR_RENTAL:
-        load_passenger(3);
+        load_passenger_car_rental();
         break;
       case EVENT_UNLOAD_PASSENGER_TERMINAL_1:
-        unload_passenger(1);
+        unload_passenger_terminal_1();
         break;
       case EVENT_UNLOAD_PASSENGER_TERMINAL_2:
-        unload_passenger(2);
+        unload_passenger_terminal_2();
         break;
       case EVENT_UNLOAD_PASSENGER_CAR_RENTAL:
-        unload_passenger(3);
+        unload_passenger_car_rental();
         break;
       case EVENT_PASSENGER_ARRIVAL_CAR_RENTAL:
         passenger_arrival_car_rental();
@@ -181,6 +186,10 @@ int random_destination() {
   return random_integer(prob_distrib, STREAM_DESTINATION); // return 1 for terminal 1, 2 for terminal 2
 }
 
+int current_amount_of_passengers() {
+  return list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2];
+}
+
 double interarrival_time_car_rental() {
   return expon(3600.00/mean_interarrival_car_rental,STREAM_INTERARRIVAL_CAR_RENTAL);
 }
@@ -202,19 +211,19 @@ void passenger_arrival_car_rental() {
 }
 
 void passenger_arrival_terminal_1() {
-  event_schedule(sim_time + interarrival_time_terminal_1(), EVENT_PASSENGER_ARRIVAL_TERMINAL_1);
   list_file(LAST, LIST_QUEUE_TERMINAL_1);
+  timest(list_size[LIST_QUEUE_TERMINAL_1], VARIABLE_LIST_QUEUE_TERMINAL_1);
   transfer[ARRIVED] = sim_time;
   transfer[DESTINATION] = DESTINATION_CAR_RENTAL;
-  timest(list_size[LIST_QUEUE_TERMINAL_1], VARIABLE_LIST_QUEUE_TERMINAL_1);
+  event_schedule(sim_time + interarrival_time_terminal_1(), EVENT_PASSENGER_ARRIVAL_TERMINAL_1);
 }
 
 void passenger_arrival_terminal_2() {
-  event_schedule(sim_time + interarrival_time_terminal_2(), EVENT_PASSENGER_ARRIVAL_TERMINAL_2);
   list_file(LAST, LIST_QUEUE_TERMINAL_2);
+  timest(list_size[LIST_QUEUE_TERMINAL_2], VARIABLE_LIST_QUEUE_TERMINAL_2);
   transfer[ARRIVED] = sim_time;
   transfer[DESTINATION] = DESTINATION_CAR_RENTAL;
-  timest(list_size[LIST_QUEUE_TERMINAL_2], VARIABLE_LIST_QUEUE_TERMINAL_2);
+  event_schedule(sim_time + interarrival_time_terminal_2(), EVENT_PASSENGER_ARRIVAL_TERMINAL_2);
 }
 
 void arrive_car_rental() {
@@ -226,12 +235,12 @@ void arrive_car_rental() {
   }
 
   // Load passengers
-  if (list_size[LIST_QUEUE_CAR_RENTAL] > 0) {
+  else if (list_size[LIST_QUEUE_CAR_RENTAL] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) {
     event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_CAR_RENTAL);
   }
 
   // Schedule departure
-  event_schedule(sim_time + min_wait, EVENT_BUS_DEPARTURE_CAR_RENTAL);
+  else event_schedule(sim_time + min_wait, EVENT_BUS_DEPARTURE_CAR_RENTAL);
 }
 
 void depart_car_rental() {
@@ -254,12 +263,12 @@ void arrive_terminal_1() {
   }
 
   // Load passengers
-  if (list_size[LIST_QUEUE_TERMINAL_1] > 0) {
+  else if (list_size[LIST_QUEUE_TERMINAL_1] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) {
     event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_TERMINAL_1);
   }
 
   // Schedule departure
-  event_schedule(sim_time + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_1);
+  else event_schedule(sim_time + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_1);
 }
 
 void depart_terminal_1() {
@@ -280,12 +289,12 @@ void arrive_terminal_2() {
   }
 
   // Load passengers
-  if (list_size[LIST_QUEUE_TERMINAL_2] > 0) {
+  else if (list_size[LIST_QUEUE_TERMINAL_2] > 0  && current_amount_of_passengers() < MAX_PASSENGERS) {
     event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_TERMINAL_2);
   }
 
   // Schedule departure
-  event_schedule(sim_time + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_2);
+  else event_schedule(sim_time + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_2);
 }
 
 void depart_terminal_2() {
@@ -293,77 +302,78 @@ void depart_terminal_2() {
     event_schedule(bus_arrival + min_wait, EVENT_BUS_DEPARTURE_TERMINAL_2);
   } else {
     sampst(sim_time - bus_arrival, VARIABLE_BUS_STOP_TIME_TERMINAL_2);
-    event_schedule(sim_time + time_spent_to_next_place(1), EVENT_BUS_ARRIVAL_CAR_RENTAL);
+    event_schedule(sim_time + time_spent_to_next_place(4.5), EVENT_BUS_ARRIVAL_CAR_RENTAL);
   }
 }
 
-void load_passenger(int loc) {
-  list_remove(FIRST, loc);
-  double load_time = uniform(min_load, max_load, STREAM_LOAD_PASSENGER);
-  if (loc == 3) { // car rental
-    timest(list_size[LIST_QUEUE_CAR_RENTAL], VARIABLE_LIST_QUEUE_CAR_RENTAL);
-    sampst(sim_time-transfer[ARRIVED], VARIABLE_DELAY_CAR_RENTAL);
-    if (transfer[DESTINATION] == DESTINATION_TERMINAL_1) {
-      list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_1);
-      // kl masi ada jadwalin lg
-      if (list_size[LIST_QUEUE_CAR_RENTAL] > 0 && (list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2]) < MAX_PASSENGERS) {
-        event_schedule(sim_time+load_time, EVENT_LOAD_PASSENGER_CAR_RENTAL);
-      }
-    }
-    else {
-      list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_2);
-      // kl masi ada jadwalin lg
-      if (list_size[LIST_QUEUE_CAR_RENTAL] > 0 && (list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2]) < MAX_PASSENGERS) {
-        event_schedule(sim_time+load_time, EVENT_LOAD_PASSENGER_CAR_RENTAL);
-      }
-    }
-  }
-  else {
-    list_file(LAST, LIST_QUEUE_BUS_DEST_CAR_RENTAL);
+void load_passenger_car_rental() {
+  list_remove(FIRST, LIST_QUEUE_CAR_RENTAL);
+  timest(list_size[LIST_QUEUE_CAR_RENTAL], VARIABLE_LIST_QUEUE_CAR_RENTAL);
+  sampst(sim_time - transfer[ARRIVED], VARIABLE_DELAY_CAR_RENTAL);
+  
+  if (transfer[ARRIVED] == DESTINATION_TERMINAL_1) list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_1);
+  else list_file(LAST, LIST_QUEUE_BUS_DEST_TERMINAL_2);
 
-    if (loc == 1) {
-      timest(list_size[LIST_QUEUE_TERMINAL_1], VARIABLE_LIST_QUEUE_TERMINAL_1);
-      sampst(sim_time-transfer[ARRIVED], VARIABLE_DELAY_TERMINAL_1);
-      if (list_size[LIST_QUEUE_TERMINAL_1] > 0 && list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] < MAX_PASSENGERS) {
-        event_schedule(sim_time+load_time, EVENT_LOAD_PASSENGER_TERMINAL_1);
-      }
-    }
-    else if (loc == 2) {
-      timest(list_size[LIST_QUEUE_TERMINAL_2], VARIABLE_LIST_QUEUE_TERMINAL_2);
-      sampst(sim_time-transfer[ARRIVED], VARIABLE_DELAY_TERMINAL_2);
-      if (list_size[LIST_QUEUE_TERMINAL_2] > 0 && list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] < MAX_PASSENGERS) {
-        event_schedule(sim_time+load_time, EVENT_LOAD_PASSENGER_TERMINAL_2);
-      }
-    }
-  }
-  timest(list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2], VARIABLE_LIST_QUEUE_BUS);
+  timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);
+
+  if (list_size[LIST_QUEUE_CAR_RENTAL] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_CAR_RENTAL);
+  else event_schedule(sim_time, EVENT_BUS_DEPARTURE_CAR_RENTAL);
 }
 
-void unload_passenger(int loc) {
-  double next_unload_time = uniform(min_unload, max_unload, STREAM_UNLOAD_PASSENGER);
-  if (loc == 1) {
-    list_remove(FIRST, LIST_QUEUE_BUS_DEST_TERMINAL_1); 
+void unload_passenger_car_rental() {
+  list_remove(FIRST, LIST_QUEUE_BUS_DEST_CAR_RENTAL);
+  timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);
+  sampst(sim_time - transfer[ARRIVED], VARIABLE_PERSON_SYSTEM);
 
-    if (list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] > 0) {
-      event_schedule(sim_time + next_unload_time, EVENT_UNLOAD_PASSENGER_TERMINAL_1);
-    }
-  }
-  else if (loc == 2) {
-    list_remove(FIRST, LIST_QUEUE_BUS_DEST_TERMINAL_2); 
+  if (list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] > 0) event_schedule(sim_time + uniform(min_unload, max_unload, STREAM_UNLOAD_PASSENGER), EVENT_UNLOAD_PASSENGER_CAR_RENTAL);
+  else if (list_size[LIST_QUEUE_CAR_RENTAL] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_CAR_RENTAL);
+  else event_schedule(sim_time, EVENT_BUS_DEPARTURE_CAR_RENTAL);
+}
 
-    if (list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2] > 0) {
-      event_schedule(sim_time + next_unload_time, EVENT_UNLOAD_PASSENGER_TERMINAL_2);
-    }
-  }
-  else {
-    list_remove(FIRST, LIST_QUEUE_BUS_DEST_CAR_RENTAL); 
+void load_passenger_terminal_1() {
+  list_remove(FIRST, LIST_QUEUE_TERMINAL_1);
+  timest(list_size[LIST_QUEUE_TERMINAL_1], VARIABLE_LIST_QUEUE_TERMINAL_1);
+  sampst(sim_time - transfer[ARRIVED], VARIABLE_DELAY_TERMINAL_1);
+  
+  list_file(LAST, LIST_QUEUE_BUS_DEST_CAR_RENTAL);
 
-    if (list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] > 0) {
-      event_schedule(sim_time + next_unload_time, EVENT_UNLOAD_PASSENGER_CAR_RENTAL);
-    }
-  }
-  sampst(sim_time-transfer[ARRIVED],VARIABLE_PERSON_SYSTEM);
-  timest(list_size[LIST_QUEUE_BUS_DEST_CAR_RENTAL] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] + list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2], VARIABLE_LIST_QUEUE_BUS);
+  timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);
+
+  if (list_size[LIST_QUEUE_TERMINAL_1] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_TERMINAL_1);
+  else event_schedule(sim_time, EVENT_BUS_DEPARTURE_TERMINAL_1);
+}
+
+void unload_passenger_terminal_1() {
+  list_remove(FIRST, LIST_QUEUE_BUS_DEST_TERMINAL_1);
+  timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);
+  sampst(sim_time - transfer[ARRIVED], VARIABLE_PERSON_SYSTEM);
+
+  if (list_size[LIST_QUEUE_BUS_DEST_TERMINAL_1] > 0) event_schedule(sim_time + uniform(min_unload, max_unload, STREAM_UNLOAD_PASSENGER), EVENT_UNLOAD_PASSENGER_TERMINAL_1);
+  else if (list_size[LIST_QUEUE_TERMINAL_1] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_TERMINAL_1);
+  else event_schedule(sim_time, EVENT_BUS_DEPARTURE_TERMINAL_1);
+}
+
+void load_passenger_terminal_2() {
+  list_remove(FIRST, LIST_QUEUE_TERMINAL_2);
+  timest(list_size[LIST_QUEUE_TERMINAL_2], VARIABLE_LIST_QUEUE_TERMINAL_2);
+  sampst(sim_time - transfer[ARRIVED], VARIABLE_DELAY_TERMINAL_2);
+  
+  list_file(LAST, LIST_QUEUE_BUS_DEST_CAR_RENTAL);
+
+  timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);
+
+  if (list_size[LIST_QUEUE_TERMINAL_2] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_TERMINAL_2);
+  else event_schedule(sim_time, EVENT_BUS_DEPARTURE_TERMINAL_2);
+}
+
+void unload_passenger_terminal_2() {
+  list_remove(FIRST, LIST_QUEUE_BUS_DEST_TERMINAL_2);
+  timest(current_amount_of_passengers(), VARIABLE_LIST_QUEUE_BUS);
+  sampst(sim_time - transfer[ARRIVED], VARIABLE_PERSON_SYSTEM);
+
+  if (list_size[LIST_QUEUE_BUS_DEST_TERMINAL_2] > 0) event_schedule(sim_time + uniform(min_unload, max_unload, STREAM_UNLOAD_PASSENGER), EVENT_UNLOAD_PASSENGER_TERMINAL_2);
+  else if (list_size[LIST_QUEUE_TERMINAL_2] > 0 && current_amount_of_passengers() < MAX_PASSENGERS) event_schedule(sim_time + uniform(min_load, max_load, STREAM_LOAD_PASSENGER), EVENT_LOAD_PASSENGER_TERMINAL_2);
+  else event_schedule(sim_time, EVENT_BUS_DEPARTURE_TERMINAL_2);
 }
 
 void report() {
